@@ -86,7 +86,7 @@
             </div>
 
             <div class="col-md-4 mb-3">
-                <label for="tgl_kembali" class="form-label">Tanggal Kembali *</label>
+                <label for="tgl_kembali" class="form-label">Tanggal Harus Kembali *</label>
                 <input type="date" name="tgl_kembali" id="tgl_kembali" required
                        value="{{ $transaksi->tgl_kembali }}"
                        class="form-control">
@@ -139,6 +139,22 @@
                 </h5>
             </div>
             <div class="card-body">
+                <!-- Info Batas Waktu -->
+                <div class="alert alert-warning mb-3">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <div>
+                            <strong>Peraturan Denda:</strong>
+                            <ul class="mb-0 ps-3">
+                                <li>Batas peminjaman: <strong>3 hari</strong></li>
+                                <li>Jika dikembalikan setelah 3 hari, dikenakan denda telat</li>
+                                <li>Denda telat: <strong>Rp 6.000 per hari</strong></li>
+                                <li>Denda hilang: <strong>Rp 100.000 per buku</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Denda Telat Manual -->
                 <div class="row mb-3">
                     <div class="col-md-6">
@@ -216,21 +232,6 @@
             </div>
         </div>
 
-        <!-- Info Denda Otomatis -->
-        <div class="alert alert-info mb-3">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-info-circle me-2"></i>
-                <div>
-                    <small class="d-block mb-1">
-                        <strong>Catatan:</strong> Sistem perhitungan denda:
-                    </small>
-                    <small class="d-block mb-1">• Keterlambatan: Rp 6.000 per hari (bisa diatur manual)</small>
-                    <small class="d-block mb-1">• Buku hilang: Rp 100.000 per buku (opsional)</small>
-                    <small class="d-block">• Denda otomatis dihitung saat status diubah ke "Selesai"</small>
-                </div>
-            </div>
-        </div>
-
         <div class="d-flex justify-content-between mt-4">
             <div>
                 <a href="{{ route('transaksi.index') }}" class="btn btn-secondary me-2">
@@ -243,6 +244,9 @@
             <div>
                 <button type="button" class="btn btn-success me-2" onclick="hitungDendaOtomatis()">
                     <i class="fas fa-calculator me-1"></i> Hitung Denda Otomatis
+                </button>
+                <button type="button" class="btn btn-warning me-2" onclick="cekBatasWaktu()">
+                    <i class="fas fa-clock me-1"></i> Cek Batas Waktu
                 </button>
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-save me-1"></i> Update Transaksi
@@ -288,6 +292,7 @@ function toggleDendaFields() {
         if (!tglPengembalian.value) {
             tglPengembalian.value = new Date().toISOString().split('T')[0];
         }
+        cekBatasWaktu();
     } else if (status == '2') { // Hilang
         dendaSection.style.display = 'block';
         if (!tglPengembalian.value) {
@@ -303,6 +308,94 @@ function toggleDendaFields() {
     
     // Update denda display
     updateDendaDisplay();
+}
+
+function cekBatasWaktu() {
+    const tglPinjam = document.getElementById('tgl_pinjam').value;
+    const tglPengembalian = document.getElementById('tgl_pengembalian').value;
+    const tglKembali = document.getElementById('tgl_kembali').value;
+    
+    if (!tglPinjam || !tglPengembalian) {
+        alert('Harap isi tanggal pinjam dan tanggal pengembalian terlebih dahulu');
+        return;
+    }
+    
+    const datePinjam = new Date(tglPinjam);
+    const datePengembalian = new Date(tglPengembalian);
+    const dateKembali = new Date(tglKembali);
+    
+    // Hitung selisih hari sejak pinjam
+    const diffTimePinjam = datePengembalian - datePinjam;
+    const diffDaysPinjam = Math.ceil(diffTimePinjam / (1000 * 60 * 60 * 24));
+    
+    // Hitung selisih hari dari tanggal kembali
+    const diffTimeKembali = datePengembalian - dateKembali;
+    const diffDaysKembali = Math.ceil(diffTimeKembali / (1000 * 60 * 60 * 24));
+    
+    let hariTelat = 0;
+    let pesan = '';
+    
+    // Cek apakah melewati batas 3 hari
+    if (diffDaysPinjam > 3) {
+        hariTelat = diffDaysPinjam - 3;
+        pesan = `Buku dipinjam selama ${diffDaysPinjam} hari (melewati batas 3 hari).\n`;
+        pesan += `Keterlambatan: ${hariTelat} hari. Denda: Rp ${formatRupiah(hariTelat * 6000)}`;
+    } else if (diffDaysKembali > 0) {
+        hariTelat = diffDaysKembali;
+        pesan = `Keterlambatan dari tanggal harus kembali: ${hariTelat} hari.\n`;
+        pesan += `Denda: Rp ${formatRupiah(hariTelat * 6000)}`;
+    } else {
+        pesan = 'Tidak ada keterlambatan. Buku dikembalikan sesuai batas waktu.';
+    }
+    
+    if (hariTelat > 0) {
+        document.getElementById('hari_telat').value = hariTelat;
+        hitungDendaManual();
+    }
+    
+    alert(pesan);
+}
+
+function hitungDendaOtomatis() {
+    const tglPinjam = document.getElementById('tgl_pinjam').value;
+    const tglKembali = document.getElementById('tgl_kembali').value;
+    const tglPengembalian = document.getElementById('tgl_pengembalian').value;
+    
+    if (!tglPengembalian) {
+        alert('Harap isi tanggal pengembalian terlebih dahulu');
+        return;
+    }
+    
+    const datePinjam = new Date(tglPinjam);
+    const dateKembali = new Date(tglKembali);
+    const datePengembalian = new Date(tglPengembalian);
+    
+    // Hitung selisih dari tanggal kembali
+    const diffTimeKembali = datePengembalian - dateKembali;
+    const diffDaysKembali = Math.ceil(diffTimeKembali / (1000 * 60 * 60 * 24));
+    
+    // Hitung selisih dari tanggal pinjam
+    const diffTimePinjam = datePengembalian - datePinjam;
+    const diffDaysPinjam = Math.ceil(diffTimePinjam / (1000 * 60 * 60 * 24));
+    
+    let hariTelat = 0;
+    let pesan = '';
+    
+    // Prioritas: cek apakah melewati batas 3 hari sejak pinjam
+    if (diffDaysPinjam > 3) {
+        hariTelat = diffDaysPinjam - 3;
+        pesan = `Melewati batas 3 hari peminjaman.\nTerlambat ${hariTelat} hari. Denda: Rp ${formatRupiah(hariTelat * 6000)}`;
+    } else if (diffDaysKembali > 0) {
+        hariTelat = diffDaysKembali;
+        pesan = `Terlambat ${hariTelat} hari dari tanggal harus kembali.\nDenda: Rp ${formatRupiah(hariTelat * 6000)}`;
+    } else {
+        hariTelat = 0;
+        pesan = 'Tidak ada keterlambatan';
+    }
+    
+    document.getElementById('hari_telat').value = hariTelat;
+    hitungDendaManual();
+    alert(pesan);
 }
 
 function toggleDendaHilang() {
@@ -331,31 +424,6 @@ function hitungDendaManual() {
     document.getElementById('denda_telat').value = dendaTelat;
     
     hitungTotalDenda();
-}
-
-function hitungDendaOtomatis() {
-    const tglKembali = document.getElementById('tgl_kembali').value;
-    const tglPengembalian = document.getElementById('tgl_pengembalian').value;
-    
-    if (!tglPengembalian) {
-        alert('Harap isi tanggal pengembalian terlebih dahulu');
-        return;
-    }
-    
-    const dateKembali = new Date(tglKembali);
-    const datePengembalian = new Date(tglPengembalian);
-    const diffTime = datePengembalian - dateKembali;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays > 0) {
-        document.getElementById('hari_telat').value = diffDays;
-        hitungDendaManual();
-        alert(`Terlambat ${diffDays} hari. Denda: Rp ${formatRupiah(diffDays * 6000)}`);
-    } else {
-        document.getElementById('hari_telat').value = 0;
-        hitungDendaManual();
-        alert('Tidak ada keterlambatan');
-    }
 }
 
 function hitungTotalDenda() {

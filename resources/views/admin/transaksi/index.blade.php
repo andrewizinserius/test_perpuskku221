@@ -272,25 +272,26 @@
         </table>
         
         <!-- Info Denda Per Hari -->
-        <div class="card mt-4">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">
-                    <i class="fas fa-info-circle me-2"></i>Informasi Denda
-                </h6>
+<div class="card mt-4">
+    <div class="card-header bg-light">
+        <h6 class="mb-0">
+            <i class="fas fa-info-circle me-2"></i>Informasi Denda
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p class="mb-2"><strong>Batas Peminjaman:</strong> 3 hari</p>
+                <p class="mb-2"><strong>Denda Keterlambatan:</strong> Rp 6.000 per hari setelah 3 hari</p>
+                <p class="mb-0"><small class="text-muted">Dikenakan jika buku tidak dikembalikan dalam 3 hari sejak pinjam</small></p>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <p class="mb-2"><strong>Denda Keterlambatan:</strong> Rp 6.000 per hari</p>
-                        <p class="mb-0"><small class="text-muted">Dihitung berdasarkan selisih hari antara tanggal kembali dan tanggal pengembalian</small></p>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="mb-2"><strong>Denda Kehilangan:</strong> Rp 100.000 per buku</p>
-                        <p class="mb-0"><small class="text-muted">Dikenakan jika buku ditandai hilang</small></p>
-                    </div>
-                </div>
+            <div class="col-md-6">
+                <p class="mb-2"><strong>Denda Kehilangan:</strong> Rp 100.000 per buku</p>
+                <p class="mb-0"><small class="text-muted">Dikenakan jika buku ditandai hilang</small></p>
             </div>
         </div>
+    </div>
+</div>
     </div>
 </div>
 
