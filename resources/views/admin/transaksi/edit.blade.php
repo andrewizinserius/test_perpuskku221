@@ -1,0 +1,415 @@
+@extends('admin.layout')
+
+@section('content')
+<div class="container-fluid mt-4">
+    <h2 class="fw-bold mb-4">Edit Transaksi #{{ $transaksi->id_transaksi }}</h2>
+
+    <!-- Info Denda -->
+    @if($transaksi->total_denda > 0)
+    <div class="alert alert-{{ $transaksi->denda_dibayar ? 'info' : 'warning' }} mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h6 class="mb-1">
+                    <i class="fas fa-money-bill-wave me-2"></i>
+                    Informasi Denda
+                </h6>
+                <p class="mb-0">
+                    Total denda: <strong>Rp {{ number_format($transaksi->total_denda, 0, ',', '.') }}</strong>
+                    @if($transaksi->denda_dibayar)
+                        <span class="badge bg-success ms-2">LUNAS</span>
+                    @else
+                        <span class="badge bg-danger ms-2">BELUM DIBAYAR</span>
+                    @endif
+                </p>
+                @if($transaksi->denda_telat > 0)
+                    <p class="mb-0">Denda telat: Rp {{ number_format($transaksi->denda_telat, 0, ',', '.') }}</p>
+                @endif
+                @if($transaksi->denda_hilang > 0)
+                    <p class="mb-0">Denda hilang: Rp {{ number_format($transaksi->denda_hilang, 0, ',', '.') }}</p>
+                @endif
+            </div>
+            <a href="{{ route('transaksi.showDenda', $transaksi->id_transaksi) }}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-info-circle me-1"></i> Detail Denda
+            </a>
+        </div>
+    </div>
+    @endif
+
+    <form action="{{ route('transaksi.update', $transaksi->id_transaksi) }}" method="POST" id="editForm">
+        @csrf
+        @method('PUT')
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="id_pustaka" class="form-label">Buku *</label>
+                <select name="id_pustaka" id="id_pustaka" required class="form-select">
+                    <option value="">-- Pilih Buku --</option>
+                    @foreach ($pustakas as $pustaka)
+                        <option value="{{ $pustaka->id_pustaka }}" 
+                                {{ $transaksi->id_pustaka == $pustaka->id_pustaka ? 'selected' : '' }}
+                                data-stock="{{ $pustaka->jml_book }}">
+                            {{ $pustaka->judul_pustaka }} (Stok: {{ $pustaka->jml_book }})
+                        </option>
+                    @endforeach
+                </select>
+                @error('id_pustaka')
+                    <div class="text-danger">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <label for="id_anggota" class="form-label">Anggota *</label>
+                <select name="id_anggota" id="id_anggota" required class="form-select">
+                    <option value="">-- Pilih Anggota --</option>
+                    @foreach ($anggotas as $anggota)
+                        <option value="{{ $anggota->id_anggota }}"
+                                {{ $transaksi->id_anggota == $anggota->id_anggota ? 'selected' : '' }}>
+                            {{ $anggota->nama_anggota }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('id_anggota')
+                    <div class="text-danger">{{ $message }}</div>
+                @enderror
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label for="tgl_pinjam" class="form-label">Tanggal Pinjam *</label>
+                <input type="date" name="tgl_pinjam" id="tgl_pinjam" required
+                       value="{{ $transaksi->tgl_pinjam }}"
+                       class="form-control">
+                @error('tgl_pinjam')
+                    <div class="text-danger">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div class="col-md-4 mb-3">
+                <label for="tgl_kembali" class="form-label">Tanggal Kembali *</label>
+                <input type="date" name="tgl_kembali" id="tgl_kembali" required
+                       value="{{ $transaksi->tgl_kembali }}"
+                       class="form-control">
+                @error('tgl_kembali')
+                    <div class="text-danger">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div class="col-md-4 mb-3">
+                <label for="tgl_pengembalian" class="form-label">Tanggal Pengembalian</label>
+                <input type="date" name="tgl_pengembalian" id="tgl_pengembalian"
+                       value="{{ $transaksi->tgl_pengembalian }}"
+                       class="form-control">
+                <small class="text-muted">Kosongkan jika belum dikembalikan</small>
+                @error('tgl_pengembalian')
+                    <div class="text-danger">{{ $message }}</div>
+                @enderror
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="fp" class="form-label">Status *</label>
+                <select name="fp" id="fp" required class="form-select" onchange="toggleDendaFields()">
+                    <option value="0" {{ $transaksi->fp == 0 ? 'selected' : '' }}>Dipinjam</option>
+                    <option value="1" {{ $transaksi->fp == 1 ? 'selected' : '' }}>Selesai</option>
+                    <option value="2" {{ $transaksi->fp == 2 ? 'selected' : '' }}>Hilang</option>
+                </select>
+                @error('fp')
+                    <div class="text-danger">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <label for="keterangan" class="form-label">Keterangan</label>
+                <input type="text" name="keterangan" id="keterangan"
+                       value="{{ $transaksi->keterangan }}"
+                       class="form-control">
+                @error('keterangan')
+                    <div class="text-danger">{{ $message }}</div>
+                @enderror
+            </div>
+        </div>
+
+        <!-- Input Denda Manual -->
+        <div class="card mb-4" id="dendaSection" style="{{ $transaksi->fp == 1 ? '' : 'display: none;' }}">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-calculator me-2"></i> Pengaturan Denda
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Denda Telat Manual -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="hari_telat" class="form-label">Jumlah Hari Keterlambatan</label>
+                        <div class="input-group">
+                            <input type="number" name="hari_telat" id="hari_telat" 
+                                   class="form-control" min="0" max="365"
+                                   value="{{ $transaksi->fp == 1 ? $transaksi->hari_terlambat : 0 }}">
+                            <span class="input-group-text">hari</span>
+                        </div>
+                        <small class="text-muted">Masukkan jumlah hari keterlambatan (0-365)</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Denda Telat</label>
+                        <div class="input-group">
+                            <span class="input-group-text">Rp</span>
+                            <input type="text" id="denda_telat_display" class="form-control" 
+                                   value="{{ number_format($transaksi->denda_telat, 0, ',', '.') }}" readonly>
+                            <input type="hidden" name="denda_telat" id="denda_telat" 
+                                   value="{{ $transaksi->denda_telat }}">
+                        </div>
+                        <small class="text-muted">Otomatis: Rp 6.000 x hari keterlambatan</small>
+                    </div>
+                </div>
+
+                <!-- Denda Hilang -->
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="form-check">
+                            <input type="checkbox" name="denda_hilang_check" id="denda_hilang_check" 
+                                   class="form-check-input" 
+                                   {{ $transaksi->denda_hilang > 0 ? 'checked' : '' }}
+                                   onchange="toggleDendaHilang()">
+                            <label class="form-check-label" for="denda_hilang_check">
+                                <strong>Tandai sebagai denda buku hilang</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted">Jika dicentang, akan dikenakan denda hilang Rp 100.000</small>
+                        
+                        <div id="denda_hilang_input" style="{{ $transaksi->denda_hilang > 0 ? '' : 'display: none;' }}" class="mt-2">
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="text" class="form-control" value="100,000" readonly>
+                                <input type="hidden" name="denda_hilang" id="denda_hilang" 
+                                       value="{{ $transaksi->denda_hilang > 0 ? 100000 : 0 }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Denda -->
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="alert alert-warning">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Total Denda</h6>
+                                    <h4 class="mb-0" id="total_denda_display">
+                                        Rp {{ number_format($transaksi->total_denda, 0, ',', '.') }}
+                                    </h4>
+                                    <input type="hidden" name="total_denda" id="total_denda" 
+                                           value="{{ $transaksi->total_denda }}">
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="denda_dibayar" id="denda_dibayar" 
+                                           class="form-check-input" {{ $transaksi->denda_dibayar ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="denda_dibayar">
+                                        Denda sudah dibayar
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Denda Otomatis -->
+        <div class="alert alert-info mb-3">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle me-2"></i>
+                <div>
+                    <small class="d-block mb-1">
+                        <strong>Catatan:</strong> Sistem perhitungan denda:
+                    </small>
+                    <small class="d-block mb-1">• Keterlambatan: Rp 6.000 per hari (bisa diatur manual)</small>
+                    <small class="d-block mb-1">• Buku hilang: Rp 100.000 per buku (opsional)</small>
+                    <small class="d-block">• Denda otomatis dihitung saat status diubah ke "Selesai"</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between mt-4">
+            <div>
+                <a href="{{ route('transaksi.index') }}" class="btn btn-secondary me-2">
+                    <i class="fas fa-arrow-left me-1"></i> Batal
+                </a>
+                <a href="{{ route('transaksi.showDenda', $transaksi->id_transaksi) }}" class="btn btn-info">
+                    <i class="fas fa-money-bill-wave me-1"></i> Detail Denda
+                </a>
+            </div>
+            <div>
+                <button type="button" class="btn btn-success me-2" onclick="hitungDendaOtomatis()">
+                    <i class="fas fa-calculator me-1"></i> Hitung Denda Otomatis
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i> Update Transaksi
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validasi stok buku saat edit
+    const selectBuku = document.getElementById('id_pustaka');
+    
+    selectBuku.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const stock = parseInt(selectedOption.getAttribute('data-stock'));
+        
+        if (stock < 1) {
+            alert('Buku ini tidak tersedia (stok habis)');
+            this.value = '{{ $transaksi->id_pustaka }}';
+        }
+    });
+    
+    // Inisialisasi hitung denda saat halaman dimuat
+    updateDendaDisplay();
+    
+    // Event listener untuk input hari telat
+    const hariTelatInput = document.getElementById('hari_telat');
+    hariTelatInput.addEventListener('input', function() {
+        hitungDendaManual();
+    });
+});
+
+function toggleDendaFields() {
+    const statusSelect = document.getElementById('fp');
+    const status = statusSelect.value;
+    const tglPengembalian = document.getElementById('tgl_pengembalian');
+    const dendaSection = document.getElementById('dendaSection');
+    
+    if (status == '1') { // Selesai
+        dendaSection.style.display = 'block';
+        if (!tglPengembalian.value) {
+            tglPengembalian.value = new Date().toISOString().split('T')[0];
+        }
+    } else if (status == '2') { // Hilang
+        dendaSection.style.display = 'block';
+        if (!tglPengembalian.value) {
+            tglPengembalian.value = new Date().toISOString().split('T')[0];
+        }
+        // Otomatis centang denda hilang
+        document.getElementById('denda_hilang_check').checked = true;
+        toggleDendaHilang();
+        alert('PERHATIAN: Mengubah status menjadi "Hilang" akan mengakibatkan denda Rp 100.000');
+    } else {
+        dendaSection.style.display = 'none';
+    }
+    
+    // Update denda display
+    updateDendaDisplay();
+}
+
+function toggleDendaHilang() {
+    const dendaHilangCheck = document.getElementById('denda_hilang_check');
+    const dendaHilangInput = document.getElementById('denda_hilang_input');
+    const dendaHilangValue = document.getElementById('denda_hilang');
+    
+    if (dendaHilangCheck.checked) {
+        dendaHilangInput.style.display = 'block';
+        dendaHilangValue.value = 100000;
+    } else {
+        dendaHilangInput.style.display = 'none';
+        dendaHilangValue.value = 0;
+    }
+    
+    hitungTotalDenda();
+}
+
+function hitungDendaManual() {
+    const hariTelat = parseInt(document.getElementById('hari_telat').value) || 0;
+    const dendaPerHari = 6000;
+    const dendaTelat = hariTelat * dendaPerHari;
+    
+    // Update tampilan dan hidden input
+    document.getElementById('denda_telat_display').value = formatRupiah(dendaTelat);
+    document.getElementById('denda_telat').value = dendaTelat;
+    
+    hitungTotalDenda();
+}
+
+function hitungDendaOtomatis() {
+    const tglKembali = document.getElementById('tgl_kembali').value;
+    const tglPengembalian = document.getElementById('tgl_pengembalian').value;
+    
+    if (!tglPengembalian) {
+        alert('Harap isi tanggal pengembalian terlebih dahulu');
+        return;
+    }
+    
+    const dateKembali = new Date(tglKembali);
+    const datePengembalian = new Date(tglPengembalian);
+    const diffTime = datePengembalian - dateKembali;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 0) {
+        document.getElementById('hari_telat').value = diffDays;
+        hitungDendaManual();
+        alert(`Terlambat ${diffDays} hari. Denda: Rp ${formatRupiah(diffDays * 6000)}`);
+    } else {
+        document.getElementById('hari_telat').value = 0;
+        hitungDendaManual();
+        alert('Tidak ada keterlambatan');
+    }
+}
+
+function hitungTotalDenda() {
+    const dendaTelat = parseInt(document.getElementById('denda_telat').value) || 0;
+    const dendaHilang = parseInt(document.getElementById('denda_hilang').value) || 0;
+    const totalDenda = dendaTelat + dendaHilang;
+    
+    document.getElementById('total_denda_display').innerHTML = formatRupiah(totalDenda);
+    document.getElementById('total_denda').value = totalDenda;
+}
+
+function updateDendaDisplay() {
+    hitungDendaManual();
+    hitungTotalDenda();
+}
+
+function formatRupiah(angka) {
+    return 'Rp ' + angka.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+// Event listener untuk submit form
+document.getElementById('editForm').addEventListener('submit', function(e) {
+    const status = document.getElementById('fp').value;
+    const dendaTelat = parseInt(document.getElementById('denda_telat').value) || 0;
+    const dendaHilang = parseInt(document.getElementById('denda_hilang').value) || 0;
+    
+    if (status == '1' && dendaTelat > 0) {
+        if (!confirm(`Konfirmasi denda keterlambatan Rp ${formatRupiah(dendaTelat)}?`)) {
+            e.preventDefault();
+            return false;
+        }
+    }
+    
+    if (status == '2' && dendaHilang == 0) {
+        if (!confirm('Status diubah menjadi Hilang tetapi denda hilang tidak dicentang. Lanjutkan?')) {
+            e.preventDefault();
+            return false;
+        }
+    }
+    
+    return true;
+});
+</script>
+
+<style>
+.input-group-text {
+    min-width: 45px;
+    justify-content: center;
+}
+.form-check-input {
+    margin-top: 0.3rem;
+}
+.card-header {
+    background-color: #f8f9fa !important;
+}
+</style>
+@endsection
