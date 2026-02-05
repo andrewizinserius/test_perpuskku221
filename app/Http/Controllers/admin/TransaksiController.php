@@ -15,6 +15,7 @@ class TransaksiController extends Controller
     // Konstanta denda
     private $DENDA_PER_HARI = 6000; // Rp 6.000 per hari
     private $DENDA_HILANG = 100000; // Rp 100.000 untuk buku hilang
+    private $BATAS_HARI_PINJAM = 3; // Batas 3 hari sejak peminjaman
 
     // Menampilkan daftar transaksi
     public function index()
@@ -29,6 +30,36 @@ class TransaksiController extends Controller
         }
         
         return view('admin.transaksi.index', compact('transaksis'));
+    }
+
+    // Helper: Hitung hari terlambat termasuk batas 3 hari
+    private function hitungHariTerlambat($transaksi)
+    {
+        if (!$transaksi->tgl_pengembalian || $transaksi->fp != 1) {
+            return 0;
+        }
+
+        $tglPinjam = Carbon::parse($transaksi->tgl_pinjam);
+        $tglPengembalian = Carbon::parse($transaksi->tgl_pengembalian);
+        $tglKembali = Carbon::parse($transaksi->tgl_kembali);
+        
+        $hariTerlambat = 0;
+
+        // Cek apakah sudah melewati batas 3 hari sejak pinjam
+        $hariSejakPinjam = $tglPengembalian->diffInDays($tglPinjam);
+        if ($hariSejakPinjam > $this->BATAS_HARI_PINJAM) {
+            $hariTelatTambahan = $hariSejakPinjam - $this->BATAS_HARI_PINJAM;
+            $hariTerlambat = $hariTelatTambahan;
+        }
+
+        // Cek terlambat dari tanggal harus kembali
+        if ($tglPengembalian->greaterThan($tglKembali)) {
+            $telatDariKembali = $tglPengembalian->diffInDays($tglKembali);
+            // Ambil yang lebih besar antara telat dari batas 3 hari atau dari tanggal kembali
+            $hariTerlambat = max($hariTerlambat, $telatDariKembali);
+        }
+
+        return $hariTerlambat;
     }
 
     // Menampilkan form untuk menambah transaksi baru
@@ -240,16 +271,10 @@ class TransaksiController extends Controller
                 return back()->withErrors(['error' => 'Buku ini sudah diproses sebelumnya.']);
             }
 
-            // Hitung denda telat
+            // Hitung denda telat dengan metode baru yang memperhitungkan batas 3 hari
             $tglPengembalian = now();
-            $tglKembali = Carbon::parse($transaksi->tgl_kembali);
-            $hariTerlambat = 0;
-            $dendaTelat = 0;
-
-            if ($tglPengembalian->greaterThan($tglKembali)) {
-                $hariTerlambat = $tglPengembalian->diffInDays($tglKembali);
-                $dendaTelat = $hariTerlambat * $this->DENDA_PER_HARI;
-            }
+            $hariTerlambat = $this->hitungHariTerlambatUntukPengembalian($transaksi, $tglPengembalian);
+            $dendaTelat = $hariTerlambat * $this->DENDA_PER_HARI;
 
             // Update transaksi dengan denda
             $transaksi->update([
@@ -278,6 +303,36 @@ class TransaksiController extends Controller
             DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan saat mengembalikan buku: ' . $e->getMessage());
         }
+    }
+
+    // Helper: Hitung hari terlambat untuk pengembalian real-time
+    private function hitungHariTerlambatUntukPengembalian($transaksi, $tglPengembalian)
+    {
+        if (!$transaksi->tgl_pengembalian) {
+            return 0;
+        }
+
+        $tglPinjam = Carbon::parse($transaksi->tgl_pinjam);
+        $tglPengembalian = Carbon::parse($tglPengembalian);
+        $tglKembali = Carbon::parse($transaksi->tgl_kembali);
+        
+        $hariTerlambat = 0;
+
+        // Cek apakah sudah melewati batas 3 hari sejak pinjam
+        $hariSejakPinjam = $tglPengembalian->diffInDays($tglPinjam);
+        if ($hariSejakPinjam > $this->BATAS_HARI_PINJAM) {
+            $hariTelatTambahan = $hariSejakPinjam - $this->BATAS_HARI_PINJAM;
+            $hariTerlambat = $hariTelatTambahan;
+        }
+
+        // Cek terlambat dari tanggal harus kembali
+        if ($tglPengembalian->greaterThan($tglKembali)) {
+            $telatDariKembali = $tglPengembalian->diffInDays($tglKembali);
+            // Ambil yang lebih besar antara telat dari batas 3 hari atau dari tanggal kembali
+            $hariTerlambat = max($hariTerlambat, $telatDariKembali);
+        }
+
+        return $hariTerlambat;
     }
 
     // Menandai buku hilang dengan denda
@@ -370,7 +425,7 @@ class TransaksiController extends Controller
         // Refresh data transaksi
         $transaksi->refresh();
         
-        // Hitung hari terlambat dengan benar
+        // Hitung hari terlambat dengan metode baru
         $hariTerlambat = $this->hitungHariTerlambat($transaksi);
         $dendaTelat = $hariTerlambat * $this->DENDA_PER_HARI;
         $dendaHilang = $transaksi->denda_hilang;
@@ -383,20 +438,6 @@ class TransaksiController extends Controller
             'dendaHilang', 
             'totalDenda'
         ));
-    }
-
-    // Helper: Hitung hari terlambat
-    private function hitungHariTerlambat($transaksi)
-    {
-        if ($transaksi->tgl_pengembalian && $transaksi->fp == 1) {
-            $tglKembali = Carbon::parse($transaksi->tgl_kembali);
-            $tglPengembalian = Carbon::parse($transaksi->tgl_pengembalian);
-            
-            if ($tglPengembalian->greaterThan($tglKembali)) {
-                return $tglPengembalian->diffInDays($tglKembali);
-            }
-        }
-        return 0;
     }
 
     // Helper: Update denda untuk transaksi
@@ -428,13 +469,27 @@ class TransaksiController extends Controller
         
         if ($newStatus == 1) { // Selesai
             if ($tglPengembalian) {
+                $tglPinjam = Carbon::parse($transaksi->tgl_pinjam);
                 $tglKembali = Carbon::parse($transaksi->tgl_kembali);
                 $tglPengembalian = Carbon::parse($tglPengembalian);
                 
-                if ($tglPengembalian->greaterThan($tglKembali)) {
-                    $hariTerlambat = $tglPengembalian->diffInDays($tglKembali);
-                    $dendaTelat = $hariTerlambat * $this->DENDA_PER_HARI;
+                $hariTerlambat = 0;
+                
+                // Cek apakah sudah melewati batas 3 hari sejak pinjam
+                $hariSejakPinjam = $tglPengembalian->diffInDays($tglPinjam);
+                if ($hariSejakPinjam > $this->BATAS_HARI_PINJAM) {
+                    $hariTelatTambahan = $hariSejakPinjam - $this->BATAS_HARI_PINJAM;
+                    $hariTerlambat = $hariTelatTambahan;
                 }
+
+                // Cek terlambat dari tanggal harus kembali
+                if ($tglPengembalian->greaterThan($tglKembali)) {
+                    $telatDariKembali = $tglPengembalian->diffInDays($tglKembali);
+                    // Ambil yang lebih besar antara telat dari batas 3 hari atau dari tanggal kembali
+                    $hariTerlambat = max($hariTerlambat, $telatDariKembali);
+                }
+                
+                $dendaTelat = $hariTerlambat * $this->DENDA_PER_HARI;
             }
         } elseif ($newStatus == 2) { // Hilang
             $dendaHilang = $this->DENDA_HILANG;

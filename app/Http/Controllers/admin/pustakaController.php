@@ -13,29 +13,25 @@ use Illuminate\Support\Facades\Storage;
 
 class PustakaController extends Controller
 {
-    // Tampilkan semua pustaka
     public function index()
     {
         $pustakas = Pustaka::all();
         return view('admin.pustaka.index', compact('pustakas'));
     }
 
-    // Tampilkan form untuk menambahkan pustaka baru
     public function create()
     {
-        $ddcs = Ddc::all();
-        $formats = Format::all();
-        $penerbits = Penerbit::all();
-        $pengarangs = Pengarang::all();
-
-        return view('admin.pustaka.create', compact('ddcs', 'formats', 'penerbits', 'pengarangs'));
+        return view('admin.pustaka.create', [
+            'ddcs' => Ddc::all(),
+            'formats' => Format::all(),
+            'penerbits' => Penerbit::all(),
+            'pengarangs' => Pengarang::all(),
+        ]);
     }
-    // Simpan pustaka baru ke database
+
     public function store(Request $request)
     {
-        // dd($request->all());
-
-        $validatedData = $request->validate([
+        $data = $request->validate([
             'kode_pustaka' => 'required|numeric|unique:tbl_pustaka,kode_pustaka',
             'id_ddc' => 'required',
             'id_format' => 'required',
@@ -43,57 +39,48 @@ class PustakaController extends Controller
             'id_pengarang' => 'required',
             'judul_pustaka' => 'required|string|max:100',
             'isbn' => 'nullable|string|max:20',
-            'gambar' => 'nullable|image|max:2048',
             'tahun_terbit' => 'nullable|string|max:5',
-            'keyword' => 'required',
-            'keterangan_fisik' => 'required',
-            'keterangan_tambahan' => 'required',
-            'abstraksi' => 'required',
-            'harga_buku' => 'nullable|numeric',
-            'kondisi_buku' => 'nullable|string|max:15',
+            'keyword' => 'required|string',
+            'keterangan_fisik' => 'required|string',
+            'keterangan_tambahan' => 'required|string',
+            'abstraksi' => 'required|string',
+            'gambar' => 'nullable|image|max:2048',
+            'harga_buku' => 'required|numeric',
+            'kondisi_buku' => 'required|string|max:15',
             'fp' => 'required',
-            'jml_pinjam' => 'required',
-            'denda_terlambat' => 'required',
-            'denda_hilang' => 'required',
+            'denda_terlambat' => 'required|numeric',
+            'denda_hilang' => 'required|numeric',
+            'jml_book' => 'required|integer|min:0',
         ]);
 
-        // dd($validatedData);
-
-        // Upload gambar jika ada
         if ($request->hasFile('gambar')) {
-            $validatedData['gambar'] = $request->file('gambar')->store('pustaka', 'public');
+            $data['gambar'] = $request->file('gambar')->store('pustaka', 'public');
         }
 
-        Pustaka::create($validatedData);
+        // PENTING
+        $data['jml_pinjam'] = 0;
 
-        return redirect()->route('pustaka.index')->with('success', 'Pustaka berhasil ditambahkan.');
+        Pustaka::create($data);
+
+        return redirect()->route('pustaka.index')->with('success', 'Pustaka berhasil ditambahkan');
     }
 
-    // Tampilkan detail pustaka
-    public function show($id_pustaka)
+    public function edit($id)
     {
-        $pustaka = Pustaka::findOrFail($id_pustaka);
-        return view('admin.pustaka.show', compact('pustaka'));
+        return view('admin.pustaka.edit', [
+            'pustaka' => Pustaka::findOrFail($id),
+            'ddcs' => Ddc::all(),
+            'formats' => Format::all(),
+            'penerbits' => Penerbit::all(),
+            'pengarangs' => Pengarang::all(),
+        ]);
     }
 
-    // Tampilkan form untuk mengedit pustaka
-    public function edit($id_pustaka)
+    public function update(Request $request, $id)
     {
-        $pustaka = Pustaka::findOrFail($id_pustaka);
-        $ddcs = Ddc::all();
-        $formats = Format::all();
-        $penerbits = Penerbit::all();
-        $pengarangs = Pengarang::all();
+        $pustaka = Pustaka::findOrFail($id);
 
-        return view('admin.pustaka.edit', compact('pustaka', 'ddcs', 'formats', 'penerbits', 'pengarangs'));
-    }
-
-    // Update data pustaka di database
-    public function update(Request $request, $id_pustaka)
-    {
-        $pustaka = Pustaka::findOrFail($id_pustaka);
-
-        $validatedData = $request->validate([
+        $data = $request->validate([
             'kode_pustaka' => 'required|numeric',
             'id_ddc' => 'required',
             'id_format' => 'required',
@@ -101,42 +88,46 @@ class PustakaController extends Controller
             'id_pengarang' => 'required',
             'judul_pustaka' => 'required|string|max:100',
             'isbn' => 'nullable|string|max:20',
-            'gambar' => 'nullable|image|max:2048',
             'tahun_terbit' => 'nullable|string|max:5',
-            'keyword' => 'required',
-            'keterangan_fisik' => 'required',
-            'keterangan_tambahan' => 'required',
-            'abstraksi' => 'required',
-            'harga_buku' => 'nullable|numeric',
-            'kondisi_buku' => 'nullable|string|max:15',
+            'keyword' => 'required|string',
+            'keterangan_fisik' => 'required|string',
+            'keterangan_tambahan' => 'required|string',
+            'abstraksi' => 'required|string',
+            'gambar' => 'nullable|image|max:2048',
+            'harga_buku' => 'required|numeric',
+            'kondisi_buku' => 'required|string|max:15',
             'fp' => 'required',
-            'jml_pinjam' => 'required',
-            'denda_terlambat' => 'required',
-            'denda_hilang' => 'required',
+            'denda_terlambat' => 'required|numeric',
+            'denda_hilang' => 'required|numeric',
+            'jml_book' => 'required|integer|min:0',
         ]);
 
-        // Upload gambar jika ada
         if ($request->hasFile('gambar')) {
-            $validatedData['gambar'] = $request->file('gambar')->store('pustaka', 'public');
+            if ($pustaka->gambar) {
+                Storage::delete('public/' . $pustaka->gambar);
+            }
+            $data['gambar'] = $request->file('gambar')->store('pustaka', 'public');
         }
 
-        $pustaka->update($validatedData);
+        $pustaka->update($data);
 
-        return redirect()->route('pustaka.index')->with('success', 'Pustaka berhasil diperbarui.');
+        return redirect()->route('pustaka.index')->with('success', 'Pustaka berhasil diperbarui');
     }
+    public function show($id)
+{
+    $pustaka = Pustaka::findOrFail($id);
+    return view('admin.pustaka.show', compact('pustaka'));
+}
 
-    // Hapus pustaka dari database
-    public function destroy($id_pustaka)
+
+    public function destroy($id)
     {
-        $pustaka = Pustaka::findOrFail($id_pustaka);
-
-        // Hapus gambar jika ada
+        $pustaka = Pustaka::findOrFail($id);
         if ($pustaka->gambar) {
             Storage::delete('public/' . $pustaka->gambar);
         }
-
         $pustaka->delete();
 
-        return redirect()->route('pustaka.index')->with('success', 'Pustaka berhasil dihapus.');
+        return redirect()->route('pustaka.index')->with('success', 'Pustaka dihapus');
     }
 }

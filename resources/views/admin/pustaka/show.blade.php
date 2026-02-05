@@ -55,6 +55,10 @@
         </tr>
         <tr>
             <th>Jumlah Buku</th>
+            <td>{{ $pustaka->jml_book }}</td>
+        </tr>
+                <tr>
+            <th>Jumlah pinjam</th>
             <td>{{ $pustaka->jml_pinjam }}</td>
         </tr>
         <tr>

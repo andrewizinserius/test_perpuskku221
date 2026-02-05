@@ -131,14 +131,31 @@
             </div>
         </div>
 
-        <!-- Input Denda Manual -->
-        <div class="card mb-4" id="dendaSection" style="{{ $transaksi->fp == 1 ? '' : 'display: none;' }}">
+        <!-- Input Denda Manual - HANYA TAMPIL JIKA STATUS SELESAI ATAU HILANG -->
+        <div class="card mb-4" id="dendaSection" style="{{ $transaksi->fp == 1 || $transaksi->fp == 2 ? '' : 'display: none;' }}">
             <div class="card-header bg-light">
                 <h5 class="mb-0">
                     <i class="fas fa-calculator me-2"></i> Pengaturan Denda
+                    @if($transaksi->fp == 1 && $transaksi->denda_dibayar)
+                        <span class="badge bg-success float-end">Denda Lunas</span>
+                    @endif
                 </h5>
             </div>
             <div class="card-body">
+                <!-- Info Penting: Status Selesai tapi belum bayar -->
+                @if($transaksi->fp == 1 && $transaksi->total_denda > 0 && !$transaksi->denda_dibayar)
+                <div class="alert alert-danger mb-3">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-circle me-2 fa-lg"></i>
+                        <div>
+                            <strong>PERHATIAN!</strong>
+                            <p class="mb-0">Status transaksi adalah <strong>SELESAI</strong> tetapi denda <strong>BELUM DIBAYAR</strong>.</p>
+                            <p class="mb-0">Silakan hitung denda terlebih dahulu, kemudian centang "Denda sudah dibayar" jika sudah dibayar.</p>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 <!-- Info Batas Waktu -->
                 <div class="alert alert-warning mb-3">
                     <div class="d-flex align-items-center">
@@ -155,14 +172,15 @@
                     </div>
                 </div>
 
-                <!-- Denda Telat Manual -->
+                <!-- Denda Telat -->
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label for="hari_telat" class="form-label">Jumlah Hari Keterlambatan</label>
                         <div class="input-group">
                             <input type="number" name="hari_telat" id="hari_telat" 
                                    class="form-control" min="0" max="365"
-                                   value="{{ $transaksi->fp == 1 ? $transaksi->hari_terlambat : 0 }}">
+                                   value="{{ old('hari_telat', $transaksi->hari_terlambat) }}"
+                                   onchange="hitungDendaManual()">
                             <span class="input-group-text">hari</span>
                         </div>
                         <small class="text-muted">Masukkan jumlah hari keterlambatan (0-365)</small>
@@ -174,9 +192,9 @@
                             <input type="text" id="denda_telat_display" class="form-control" 
                                    value="{{ number_format($transaksi->denda_telat, 0, ',', '.') }}" readonly>
                             <input type="hidden" name="denda_telat" id="denda_telat" 
-                                   value="{{ $transaksi->denda_telat }}">
+                                   value="{{ old('denda_telat', $transaksi->denda_telat) }}">
                         </div>
-                        <small class="text-muted">Otomatis: Rp 6.000 x hari keterlambatan</small>
+                        <small class="text-muted">Otomatis: Rp 6.000 × hari keterlambatan</small>
                     </div>
                 </div>
 
@@ -186,7 +204,7 @@
                         <div class="form-check">
                             <input type="checkbox" name="denda_hilang_check" id="denda_hilang_check" 
                                    class="form-check-input" 
-                                   {{ $transaksi->denda_hilang > 0 ? 'checked' : '' }}
+                                   {{ old('denda_hilang_check', $transaksi->denda_hilang > 0) ? 'checked' : '' }}
                                    onchange="toggleDendaHilang()">
                             <label class="form-check-label" for="denda_hilang_check">
                                 <strong>Tandai sebagai denda buku hilang</strong>
@@ -199,16 +217,16 @@
                                 <span class="input-group-text">Rp</span>
                                 <input type="text" class="form-control" value="100,000" readonly>
                                 <input type="hidden" name="denda_hilang" id="denda_hilang" 
-                                       value="{{ $transaksi->denda_hilang > 0 ? 100000 : 0 }}">
+                                       value="{{ old('denda_hilang', $transaksi->denda_hilang > 0 ? 100000 : 0) }}">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Total Denda -->
+                <!-- Total Denda dan Status Bayar -->
                 <div class="row">
                     <div class="col-md-12">
-                        <div class="alert alert-warning">
+                        <div class="alert {{ $transaksi->denda_dibayar ? 'alert-success' : 'alert-warning' }}">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-1">Total Denda</h6>
@@ -216,16 +234,42 @@
                                         Rp {{ number_format($transaksi->total_denda, 0, ',', '.') }}
                                     </h4>
                                     <input type="hidden" name="total_denda" id="total_denda" 
-                                           value="{{ $transaksi->total_denda }}">
+                                           value="{{ old('total_denda', $transaksi->total_denda) }}">
+                                    @if($transaksi->fp == 1 && $transaksi->total_denda > 0)
+                                        <div class="mt-2">
+                                            <small class="{{ $transaksi->denda_dibayar ? 'text-success' : 'text-danger' }}">
+                                                <i class="fas {{ $transaksi->denda_dibayar ? 'fa-check-circle' : 'fa-exclamation-circle' }} me-1"></i>
+                                                {{ $transaksi->denda_dibayar ? 'Denda sudah dibayar' : 'Denda BELUM dibayar' }}
+                                            </small>
+                                        </div>
+                                    @endif
                                 </div>
                                 <div class="form-check">
                                     <input type="checkbox" name="denda_dibayar" id="denda_dibayar" 
-                                           class="form-check-input" {{ $transaksi->denda_dibayar ? 'checked' : '' }}>
+                                           class="form-check-input" 
+                                           {{ old('denda_dibayar', $transaksi->denda_dibayar) ? 'checked' : '' }}
+                                           onchange="updateStatusBayar()">
                                     <label class="form-check-label" for="denda_dibayar">
-                                        Denda sudah dibayar
+                                        <strong>Denda sudah dibayar</strong>
                                     </label>
+                                    <div class="form-text">
+                                        Centang hanya jika denda sudah dibayar
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- PERINGATAN: Status selesai tapi belum bayar -->
+                <div id="warningBelumBayar" class="alert alert-danger" 
+                     style="{{ $transaksi->fp == 1 && $transaksi->total_denda > 0 && !$transaksi->denda_dibayar ? '' : 'display: none;' }}">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <div>
+                            <strong>PERINGATAN!</strong>
+                            <p class="mb-0">Status transaksi akan diubah menjadi <strong>SELESAI</strong> tetapi denda <strong>BELUM DIBAYAR</strong>.</p>
+                            <p class="mb-0">Pastikan Anda telah menghitung denda dengan benar sebelum menyimpan.</p>
                         </div>
                     </div>
                 </div>
@@ -273,11 +317,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inisialisasi hitung denda saat halaman dimuat
     updateDendaDisplay();
+    toggleDendaFields();
     
     // Event listener untuk input hari telat
     const hariTelatInput = document.getElementById('hari_telat');
     hariTelatInput.addEventListener('input', function() {
         hitungDendaManual();
+        checkWarning();
+    });
+    
+    // Event listener untuk status
+    const statusSelect = document.getElementById('fp');
+    statusSelect.addEventListener('change', function() {
+        checkWarning();
     });
 });
 
@@ -287,27 +339,38 @@ function toggleDendaFields() {
     const tglPengembalian = document.getElementById('tgl_pengembalian');
     const dendaSection = document.getElementById('dendaSection');
     
-    if (status == '1') { // Selesai
+    if (status == '1' || status == '2') { // Selesai atau Hilang
         dendaSection.style.display = 'block';
-        if (!tglPengembalian.value) {
+        if (!tglPengembalian.value && status == '1') {
             tglPengembalian.value = new Date().toISOString().split('T')[0];
         }
-        cekBatasWaktu();
-    } else if (status == '2') { // Hilang
-        dendaSection.style.display = 'block';
-        if (!tglPengembalian.value) {
-            tglPengembalian.value = new Date().toISOString().split('T')[0];
+        
+        if (status == '2') { // Hilang
+            // Otomatis centang denda hilang
+            document.getElementById('denda_hilang_check').checked = true;
+            toggleDendaHilang();
+            
+            // Set total denda minimal 100.000
+            const currentDenda = parseInt(document.getElementById('total_denda').value) || 0;
+            if (currentDenda < 100000) {
+                document.getElementById('denda_hilang').value = 100000;
+                hitungTotalDenda();
+            }
+            
+            // Tampilkan peringatan
+            if (!confirm('PERHATIAN: Mengubah status menjadi "Hilang" akan mengakibatkan denda minimal Rp 100.000. Lanjutkan?')) {
+                statusSelect.value = '{{ $transaksi->fp }}';
+                toggleDendaFields();
+                return;
+            }
         }
-        // Otomatis centang denda hilang
-        document.getElementById('denda_hilang_check').checked = true;
-        toggleDendaHilang();
-        alert('PERHATIAN: Mengubah status menjadi "Hilang" akan mengakibatkan denda Rp 100.000');
     } else {
         dendaSection.style.display = 'none';
     }
     
     // Update denda display
     updateDendaDisplay();
+    checkWarning();
 }
 
 function cekBatasWaktu() {
@@ -354,6 +417,7 @@ function cekBatasWaktu() {
     }
     
     alert(pesan);
+    checkWarning();
 }
 
 function hitungDendaOtomatis() {
@@ -395,6 +459,7 @@ function hitungDendaOtomatis() {
     
     document.getElementById('hari_telat').value = hariTelat;
     hitungDendaManual();
+    checkWarning();
     alert(pesan);
 }
 
@@ -412,6 +477,7 @@ function toggleDendaHilang() {
     }
     
     hitungTotalDenda();
+    checkWarning();
 }
 
 function hitungDendaManual() {
@@ -433,6 +499,16 @@ function hitungTotalDenda() {
     
     document.getElementById('total_denda_display').innerHTML = formatRupiah(totalDenda);
     document.getElementById('total_denda').value = totalDenda;
+    
+    // Update warna alert berdasarkan jumlah denda
+    const totalDendaAlert = document.querySelector('#dendaSection .alert');
+    if (totalDenda > 0) {
+        totalDendaAlert.classList.remove('alert-success', 'alert-warning');
+        totalDendaAlert.classList.add('alert-warning');
+    } else {
+        totalDendaAlert.classList.remove('alert-warning', 'alert-success');
+        totalDendaAlert.classList.add('alert-success');
+    }
 }
 
 function updateDendaDisplay() {
@@ -440,28 +516,78 @@ function updateDendaDisplay() {
     hitungTotalDenda();
 }
 
+function updateStatusBayar() {
+    const dendaDibayar = document.getElementById('denda_dibayar').checked;
+    const totalDenda = parseInt(document.getElementById('total_denda').value) || 0;
+    const totalDendaAlert = document.querySelector('#dendaSection .alert');
+    
+    if (totalDenda > 0) {
+        if (dendaDibayar) {
+            totalDendaAlert.classList.remove('alert-warning');
+            totalDendaAlert.classList.add('alert-success');
+        } else {
+            totalDendaAlert.classList.remove('alert-success');
+            totalDendaAlert.classList.add('alert-warning');
+        }
+    }
+    checkWarning();
+}
+
+function checkWarning() {
+    const status = document.getElementById('fp').value;
+    const totalDenda = parseInt(document.getElementById('total_denda').value) || 0;
+    const dendaDibayar = document.getElementById('denda_dibayar').checked;
+    const warningDiv = document.getElementById('warningBelumBayar');
+    
+    if (status == '1' && totalDenda > 0 && !dendaDibayar) {
+        warningDiv.style.display = 'block';
+    } else {
+        warningDiv.style.display = 'none';
+    }
+}
+
 function formatRupiah(angka) {
     return 'Rp ' + angka.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
-// Event listener untuk submit form
+// Event listener untuk submit form - PERBAIKAN UTAMA
 document.getElementById('editForm').addEventListener('submit', function(e) {
     const status = document.getElementById('fp').value;
-    const dendaTelat = parseInt(document.getElementById('denda_telat').value) || 0;
-    const dendaHilang = parseInt(document.getElementById('denda_hilang').value) || 0;
+    const totalDenda = parseInt(document.getElementById('total_denda').value) || 0;
+    const dendaDibayar = document.getElementById('denda_dibayar').checked;
+    const tglPengembalian = document.getElementById('tgl_pengembalian').value;
     
-    if (status == '1' && dendaTelat > 0) {
-        if (!confirm(`Konfirmasi denda keterlambatan Rp ${formatRupiah(dendaTelat)}?`)) {
+    // Validasi: Jika status Selesai, harus ada tanggal pengembalian
+    if (status == '1' && !tglPengembalian) {
+        alert('Status Selesai membutuhkan tanggal pengembalian!');
+        e.preventDefault();
+        return false;
+    }
+    
+    // Validasi: Jika status Selesai dan ada denda, berikan peringatan
+    if (status == '1' && totalDenda > 0 && !dendaDibayar) {
+        if (!confirm(`PERINGATAN: Status akan diubah menjadi SELESAI dengan denda Rp ${formatRupiah(totalDenda)} yang BELUM DIBAYAR.\n\nApakah Anda yakin?`)) {
             e.preventDefault();
             return false;
         }
     }
     
-    if (status == '2' && dendaHilang == 0) {
-        if (!confirm('Status diubah menjadi Hilang tetapi denda hilang tidak dicentang. Lanjutkan?')) {
-            e.preventDefault();
-            return false;
+    // Validasi: Jika status Hilang, pastikan denda hilang dicentang
+    if (status == '2') {
+        const dendaHilangCheck = document.getElementById('denda_hilang_check').checked;
+        if (!dendaHilangCheck) {
+            if (!confirm('Status diubah menjadi Hilang tetapi denda hilang tidak dicentang. Lanjutkan?')) {
+                e.preventDefault();
+                return false;
+            }
         }
+    }
+    
+    // Validasi: Jika denda sudah dibayar dipilih, pastikan ada denda
+    if (dendaDibayar && totalDenda == 0) {
+        alert('Tidak bisa mencentang "Denda sudah dibayar" jika tidak ada denda!');
+        e.preventDefault();
+        return false;
     }
     
     return true;
@@ -478,6 +604,14 @@ document.getElementById('editForm').addEventListener('submit', function(e) {
 }
 .card-header {
     background-color: #f8f9fa !important;
+}
+#warningBelumBayar {
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; }
+    100% { opacity: 0.8; }
 }
 </style>
 @endsection

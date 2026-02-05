@@ -24,20 +24,22 @@
         <table class="table table-striped table-hover align-middle">
             <thead class="table-dark">
                 <tr>
-                    {{-- <th>No</th> --}}
+                    <th>No</th>
                     <th>Kode Pustaka</th>
                     <th>Judul</th>
                     <th>Tahun Terbit</th>
+                    <th>Jumlah Buku</th> <!-- kolom baru -->
                     <th class="text-center">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($pustakas as $pustaka)
                     <tr>
-                        {{-- <td>{{ $loop->iteration }}</td> --}}
+                        <td>{{ $loop->iteration }}</td>
                         <td class="fw-semibold">{{ $pustaka->kode_pustaka }}</td>
                         <td>{{ $pustaka->judul_pustaka }}</td>
                         <td>{{ $pustaka->tahun_terbit }}</td>
+                        <td>{{ $pustaka->jml_book }}</td> <!-- isi jumlah buku -->
                         <td class="text-center">
                             <a href="{{ route('pustaka.show', $pustaka->id_pustaka) }}" 
                                class="btn btn-info btn-sm me-1" title="Lihat Detail">

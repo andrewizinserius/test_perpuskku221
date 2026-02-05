@@ -151,11 +151,7 @@
         </select>
     </div>
 
-    <div class="mb-4">
-        <label for="jml_pinjam" class="block">Jumlah Pinjam</label>
-        <input type="number" name="jml_pinjam" id="jml_pinjam" class="w-full p-2 border rounded form-control"
-            value="{{ old('jml_pinjam', $pustaka->jml_pinjam) }}">
-    </div>
+    
 
     <div class="mb-4">
         <label for="denda_terlambat" class="block">Denda Terlambat</label>
@@ -167,6 +163,12 @@
         <label for="denda_hilang" class="block">Denda Hilang</label>
         <input type="number" name="denda_hilang" id="denda_hilang" class="w-full p-2 border rounded form-control"
             value="{{ old('denda_hilang', $pustaka->denda_hilang) }}">
+    </div>
+
+    <div class="mb-4">
+        <label for="jml_book" class="block">Jumlah Buku</label>
+        <input type="number" name="jml_book" id="jml_book" class="w-full p-2 border rounded form-control"
+            value="{{ old('jml_book', $pustaka->jml_book) }}">
     </div>
 
     <div class="mb-4">
