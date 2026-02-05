@@ -37,9 +37,8 @@
                 <div class="card-body">
                     <h6 class="card-title">Denda Belum Dibayar</h6>
                     <h3 class="card-text">
-                        Rp {{ number_format($transaksis->where('denda_dibayar', false)->where('total_denda', '>', 0)->sum('total_denda'), 0, ',', '.') }}
+                        Rp {{ number_format($transaksis->where('denda_dibayar', false)->sum('total_denda'), 0, ',', '.') }}
                     </h3>
-                    <small class="opacity-75">{{ $transaksis->where('denda_dibayar', false)->where('total_denda', '>', 0)->count() }} transaksi</small>
                 </div>
             </div>
         </div>
@@ -50,7 +49,6 @@
                     <h3 class="card-text">
                         Rp {{ number_format($transaksis->sum('denda_telat'), 0, ',', '.') }}
                     </h3>
-                    <small class="opacity-75">{{ $transaksis->where('denda_telat', '>', 0)->count() }} transaksi telat</small>
                 </div>
             </div>
         </div>
@@ -61,7 +59,6 @@
                     <h3 class="card-text">
                         Rp {{ number_format($transaksis->sum('denda_hilang'), 0, ',', '.') }}
                     </h3>
-                    <small class="opacity-75">{{ $transaksis->where('denda_hilang', '>', 0)->count() }} buku hilang</small>
                 </div>
             </div>
         </div>
@@ -72,7 +69,6 @@
                     <h3 class="card-text">
                         Rp {{ number_format($transaksis->where('denda_dibayar', true)->sum('total_denda'), 0, ',', '.') }}
                     </h3>
-                    <small class="opacity-75">{{ $transaksis->where('denda_dibayar', true)->count() }} transaksi</small>
                 </div>
             </div>
         </div>
@@ -113,7 +109,7 @@
 
     <!-- Table -->
     <div class="table-responsive shadow-sm rounded">
-        <table class="table table-striped table-hover align-middle" id="transaksiTable">
+        <table class="table table-striped table-hover align-middle">
             <thead class="table-dark">
                 <tr>
                     <th class="text-center">ID</th>
@@ -123,59 +119,23 @@
                     <th class="text-center">Tgl Kembali</th>
                     <th class="text-center">Tgl Pengembalian</th>
                     <th class="text-center">Hari Terlambat</th>
-                    <th class="text-center">Denda Telat</th>
                     <th class="text-center">Status</th>
-                    <th class="text-center">Total Denda</th>
-                    <th class="text-center">Status Bayar</th>
+                    <th class="text-center">Denda</th>
                     <th class="text-center">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($transaksis as $transaksi)
                     @php
-                        // HITUNG DENDA TELAT LANGSUNG DI INDEX
-                        $dendaTelat = 0;
+                        // Hitung hari terlambat
                         $hariTerlambat = 0;
-                        $totalHari = 0;
-                        
-                        // Hanya hitung jika status selesai (fp=1) dan ada tanggal pengembalian
-                        if ($transaksi->fp == 1 && $transaksi->tgl_pengembalian) {
-                            $tglPinjam = \Carbon\Carbon::parse($transaksi->tgl_pinjam);
+                        if ($transaksi->tgl_pengembalian && $transaksi->fp == 1) {
                             $tglKembali = \Carbon\Carbon::parse($transaksi->tgl_kembali);
                             $tglPengembalian = \Carbon\Carbon::parse($transaksi->tgl_pengembalian);
-                            
-                            // Hitung total hari sejak pinjam
-                            $totalHari = $tglPengembalian->diffInDays($tglPinjam);
-                            
-                            // Cek apakah melewati batas 3 hari
-                            if ($totalHari > 3) {
-                                $hariTerlambat = $totalHari - 3;
-                            }
-                            
-                            // Juga cek jika terlambat dari tanggal harus kembali
                             if ($tglPengembalian->greaterThan($tglKembali)) {
-                                $telatDariKembali = $tglPengembalian->diffInDays($tglKembali);
-                                // Ambil yang lebih besar antara telat dari batas 3 hari atau dari tanggal kembali
-                                $hariTerlambat = max($hariTerlambat, $telatDariKembali);
+                                $hariTerlambat = $tglPengembalian->diffInDays($tglKembali);
                             }
-                            
-                            // Hitung denda telat
-                            $dendaTelat = $hariTerlambat * 6000;
-                            
-                            // Jika denda telat di database belum ada atau berbeda, update tampilan
-                            if ($transaksi->denda_telat != $dendaTelat && $transaksi->fp == 1) {
-                                // Tampilkan yang dihitung sekarang, tapi beri tanda
-                                $dendaTelat = $dendaTelat;
-                            } else {
-                                $dendaTelat = $transaksi->denda_telat;
-                            }
-                        } else {
-                            // Gunakan nilai dari database
-                            $dendaTelat = $transaksi->denda_telat;
                         }
-                        
-                        // Total denda = denda telat + denda hilang
-                        $totalDenda = $dendaTelat + $transaksi->denda_hilang;
                     @endphp
                     
                     <tr>
@@ -187,28 +147,9 @@
                         <td class="text-center">{{ $transaksi->tgl_pengembalian ?? '-' }}</td>
                         <td class="text-center">
                             @if($hariTerlambat > 0)
-                                <div class="d-flex flex-column align-items-center">
-                                    <span class="badge bg-danger mb-1">{{ $hariTerlambat }} hari</span>
-                                    <small class="text-muted">
-                                        @if($totalHari > 3)
-                                            ({{ $totalHari }}h total)
-                                        @endif
-                                    </small>
-                                </div>
-                            @elseif($transaksi->tgl_pengembalian && $transaksi->fp == 1)
+                                <span class="badge bg-danger">{{ $hariTerlambat }} hari</span>
+                            @elseif($transaksi->tgl_pengembalian)
                                 <span class="badge bg-success">Tepat waktu</span>
-                            @else
-                                <span class="badge bg-secondary">-</span>
-                            @endif
-                        </td>
-                        <td class="text-center">
-                            @if($dendaTelat > 0)
-                                <span class="badge bg-warning">
-                                    Rp {{ number_format($dendaTelat, 0, ',', '.') }}
-                                </span>
-                                <small class="d-block text-muted">
-                                    ({{ $hariTerlambat }} × 6.000)
-                                </small>
                             @else
                                 <span class="badge bg-secondary">-</span>
                             @endif
@@ -229,42 +170,33 @@
                             @endif
                         </td>
                         <td class="text-center">
-                            @if($totalDenda > 0)
-                                <span class="badge {{ $transaksi->denda_dibayar ? 'bg-info' : 'bg-danger' }}">
-                                    <i class="fas {{ $transaksi->denda_dibayar ? 'fa-check' : 'fa-exclamation' }} me-1"></i>
-                                    Rp {{ number_format($totalDenda, 0, ',', '.') }}
-                                </span>
-                                <div class="small text-muted">
-                                    @if($dendaTelat > 0)
-                                        <div>Telat: Rp {{ number_format($dendaTelat, 0, ',', '.') }}</div>
-                                    @endif
-                                    @if($transaksi->denda_hilang > 0)
-                                        <div>Hilang: Rp {{ number_format($transaksi->denda_hilang, 0, ',', '.') }}</div>
+                            @if($transaksi->total_denda > 0)
+                                <div class="d-flex flex-column align-items-center">
+                                    @if($transaksi->denda_dibayar)
+                                        <span class="badge bg-info mb-1">
+                                            <i class="fas fa-check me-1"></i>
+                                            Rp {{ number_format($transaksi->total_denda, 0, ',', '.') }}
+                                        </span>
+                                        <small class="text-muted">Lunas</small>
+                                    @else
+                                        <span class="badge bg-danger mb-1">
+                                            <i class="fas fa-exclamation me-1"></i>
+                                            Rp {{ number_format($transaksi->total_denda, 0, ',', '.') }}
+                                        </span>
+                                        <div class="small text-muted">
+                                            @if($transaksi->denda_telat > 0)
+                                                <span>Telat: Rp {{ number_format($transaksi->denda_telat, 0, ',', '.') }}</span>
+                                            @endif
+                                            @if($transaksi->denda_hilang > 0)
+                                                <span>Hilang: Rp {{ number_format($transaksi->denda_hilang, 0, ',', '.') }}</span>
+                                            @endif
+                                        </div>
                                     @endif
                                 </div>
                             @else
                                 <span class="badge bg-secondary">
                                     <i class="fas fa-check-circle me-1"></i> Tidak Ada
                                 </span>
-                            @endif
-                        </td>
-                        <td class="text-center">
-                            @if($totalDenda > 0)
-                                @if($transaksi->denda_dibayar)
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-check-circle me-1"></i> Lunas
-                                    </span>
-                                @else
-                                    <span class="badge bg-warning">
-                                        <i class="fas fa-clock me-1"></i> Belum Bayar
-                                    </span>
-                                    <button type="button" class="btn btn-sm btn-outline-success mt-1" 
-                                            onclick="bayarDenda('{{ $transaksi->id_transaksi }}', '{{ number_format($totalDenda, 0, ',', '.') }}')">
-                                        <i class="fas fa-credit-card"></i> Bayar
-                                    </button>
-                                @endif
-                            @else
-                                <span class="badge bg-secondary">-</span>
                             @endif
                         </td>
                         <td class="text-center">
@@ -281,10 +213,10 @@
                             </a>
 
                             <!-- Tombol Bayar Denda (jika ada denda belum dibayar) -->
-                            @if($totalDenda > 0 && !$transaksi->denda_dibayar)
+                            @if($transaksi->total_denda > 0 && !$transaksi->denda_dibayar)
                                 <form action="{{ route('transaksi.payDenda', $transaksi->id_transaksi) }}" 
                                       method="POST" class="d-inline mb-1"
-                                      onsubmit="return confirm('Konfirmasi pembayaran denda Rp {{ number_format($totalDenda, 0, ',', '.') }}?');">
+                                      onsubmit="return confirm('Konfirmasi pembayaran denda Rp {{ number_format($transaksi->total_denda, 0, ',', '.') }}?');">
                                     @csrf
                                     <button type="submit" class="btn btn-success btn-sm me-1" title="Bayar Denda">
                                         <i class="fas fa-credit-card"></i>
@@ -307,7 +239,7 @@
                             @if($transaksi->fp == 0)
                                 <form action="{{ route('transaksi.returnBook', $transaksi->id_transaksi) }}" 
                                       method="POST" class="d-inline mb-1"
-                                      onsubmit="return confirm('Yakin ingin mengembalikan buku ini? Denda akan dihitung otomatis jika terlambat.');">
+                                      onsubmit="return confirm('Yakin ingin mengembalikan buku ini?');">
                                     @csrf
                                     <button type="submit" class="btn btn-primary btn-sm me-1" title="Kembalikan">
                                         <i class="fas fa-undo"></i>
@@ -333,52 +265,33 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="12" class="text-center text-muted">Belum ada data transaksi.</td>
+                        <td colspan="11" class="text-center text-muted">Belum ada data transaksi.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
         
-        <!-- Pagination -->
-        @if($transaksis->hasPages())
-            <div class="d-flex justify-content-center mt-4">
-                {{ $transaksis->links() }}
-            </div>
-        @endif
-        
         <!-- Info Denda Per Hari -->
-        <div class="card mt-4">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">
-                    <i class="fas fa-info-circle me-2"></i>Informasi Denda
-                </h6>
+<div class="card mt-4">
+    <div class="card-header bg-light">
+        <h6 class="mb-0">
+            <i class="fas fa-info-circle me-2"></i>Informasi Denda
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p class="mb-2"><strong>Batas Peminjaman:</strong> 3 hari</p>
+                <p class="mb-2"><strong>Denda Keterlambatan:</strong> Rp 6.000 per hari setelah 3 hari</p>
+                <p class="mb-0"><small class="text-muted">Dikenakan jika buku tidak dikembalikan dalam 3 hari sejak pinjam</small></p>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <p class="mb-2"><strong>Batas Peminjaman:</strong> 3 hari</p>
-                        <p class="mb-2"><strong>Denda Keterlambatan:</strong> Rp 6.000 per hari setelah 3 hari</p>
-                        <p class="mb-0"><small class="text-muted">Dikenakan jika buku tidak dikembalikan dalam 3 hari sejak pinjam</small></p>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="mb-2"><strong>Denda Kehilangan:</strong> Rp 100.000 per buku</p>
-                        <p class="mb-0"><small class="text-muted">Dikenakan jika buku ditandai hilang</small></p>
-                    </div>
-                </div>
-                <hr>
-                <div class="row">
-                    <div class="col-md-12">
-                        <p class="mb-1"><strong>Cara Perhitungan Denda:</strong></p>
-                        <ol class="mb-0">
-                            <li>Jika dikembalikan dalam 3 hari: <strong>Tidak ada denda</strong></li>
-                            <li>Jika dikembalikan setelah 3 hari: <strong>(total hari - 3) × Rp 6.000</strong></li>
-                            <li>Jika terlambat dari tanggal harus kembali: <strong>hari terlambat × Rp 6.000</strong></li>
-                            <li>Dihitung <strong>mana yang lebih besar</strong> antara kedua aturan di atas</li>
-                        </ol>
-                    </div>
-                </div>
+            <div class="col-md-6">
+                <p class="mb-2"><strong>Denda Kehilangan:</strong> Rp 100.000 per buku</p>
+                <p class="mb-0"><small class="text-muted">Dikenakan jika buku ditandai hilang</small></p>
             </div>
         </div>
+    </div>
+</div>
     </div>
 </div>
 
@@ -387,7 +300,6 @@
     font-weight: 600; 
     letter-spacing: 0.5px; 
     vertical-align: middle;
-    white-space: nowrap;
 }
 .table-hover tbody tr:hover { 
     background: rgba(99, 102, 241, .05); 
@@ -403,17 +315,6 @@
     background-color: #0d6efd;
     color: white;
     border-color: #0d6efd;
-}
-.small.text-muted {
-    font-size: 0.75rem;
-}
-#transaksiTable th:nth-child(7),
-#transaksiTable th:nth-child(8) {
-    background-color: #ffc10720;
-}
-#transaksiTable td:nth-child(7),
-#transaksiTable td:nth-child(8) {
-    background-color: #fff9e6;
 }
 @media (max-width: 768px) {
     .table-responsive { 
@@ -432,63 +333,13 @@
     .btn-group .btn {
         margin-bottom: 5px;
     }
-    td {
-        font-size: 0.9rem;
-    }
 }
 </style>
 
 <script>
-// Fungsi untuk membayar denda
-function bayarDenda(id, jumlah) {
-    if (confirm(`Konfirmasi pembayaran denda Rp ${jumlah}?`)) {
-        fetch(`/transaksi/${id}/pay-denda`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Denda berhasil dibayar!');
-                location.reload();
-            } else {
-                alert('Gagal membayar denda: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Terjadi kesalahan saat membayar denda');
-        });
-    }
-}
-
-// Hitung denda otomatis untuk semua transaksi selesai
-function hitungSemuaDenda() {
-    if (confirm('Hitung ulang denda untuk semua transaksi selesai?')) {
-        fetch('/transaksi/hitung-semua-denda', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(`Berhasil menghitung ulang ${data.count} transaksi`);
-                location.reload();
-            } else {
-                alert('Gagal menghitung ulang denda');
-            }
-        });
-    }
-}
-
+// Filter status dengan JavaScript (opsional)
 document.addEventListener('DOMContentLoaded', function() {
-    // Filter status dengan JavaScript
+    // Tambahkan event listener untuk filter status jika diperlukan
     const filterBtns = document.querySelectorAll('.btn-group .btn');
     filterBtns.forEach(btn => {
         btn.addEventListener('click', function(e) {
@@ -497,25 +348,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-    
-    // Tambahkan tooltip untuk hari terlambat
-    const hariTelatCells = document.querySelectorAll('td:nth-child(7)');
-    hariTelatCells.forEach(cell => {
-        const badge = cell.querySelector('.badge');
-        if (badge && badge.classList.contains('bg-danger')) {
-            cell.title = 'Hari keterlambatan dihitung otomatis';
-        }
-    });
-    
-    // Tambahkan tombol hitung semua denda di header jika diperlukan
-    const header = document.querySelector('.d-flex.justify-content-between');
-    if (header && {{ $transaksis->where('fp', 1)->count() }} > 0) {
-        const hitungBtn = document.createElement('button');
-        hitungBtn.className = 'btn btn-outline-warning shadow-sm me-2';
-        hitungBtn.innerHTML = '<i class="fas fa-calculator me-1"></i> Hitung Semua Denda';
-        hitungBtn.onclick = hitungSemuaDenda;
-        header.querySelector('h2').insertAdjacentElement('afterend', hitungBtn);
-    }
 });
 </script>
 @endsection

@@ -20,9 +20,15 @@ class TransaksiController extends Controller
     // Menampilkan daftar transaksi
     public function index()
     {
+        // OPTION 1: TANPA PAGINATION (Collection)
         $transaksis = Transaksi::with('pustaka', 'anggota')
-            ->orderBy('id_transaksi', 'asc')
+            ->orderBy('id_transaksi', 'desc') // Ubah 'asc' menjadi 'desc' untuk yang terbaru di atas
             ->get();
+        
+        // OPTION 2: DENGAN PAGINATION
+        // $transaksis = Transaksi::with('pustaka', 'anggota')
+        //     ->orderBy('id_transaksi', 'desc')
+        //     ->paginate(10); // 10 item per halaman
         
         // Hitung denda untuk setiap transaksi
         foreach ($transaksis as $transaksi) {
@@ -213,8 +219,8 @@ class TransaksiController extends Controller
                 'denda_telat' => $dendaData['denda_telat'],
                 'denda_hilang' => $dendaData['denda_hilang'],
                 'total_denda' => $dendaData['total_denda'],
-                // Reset status pembayaran jika denda berubah
-                'denda_dibayar' => ($dendaData['total_denda'] == 0) ? true : $transaksi->denda_dibayar,
+                // PERBAIKAN: Jangan otomatis centang sudah bayar
+                'denda_dibayar' => ($dendaData['total_denda'] == 0) ? true : false, // Reset ke false jika ada denda
             ]);
 
             DB::commit();
@@ -283,7 +289,7 @@ class TransaksiController extends Controller
                 'denda_telat' => $dendaTelat,
                 'denda_hilang' => 0,
                 'total_denda' => $dendaTelat,
-                'denda_dibayar' => ($dendaTelat == 0) ? true : false,
+                'denda_dibayar' => false, // PERBAIKAN: Default false, admin harus manual centang
             ]);
 
             // Tambahkan jumlah buku pustaka kembali
@@ -294,7 +300,9 @@ class TransaksiController extends Controller
 
             $message = 'Buku berhasil dikembalikan.';
             if ($dendaTelat > 0) {
-                $message .= " Terlambat $hariTerlambat hari. Denda: Rp " . number_format($dendaTelat, 0, ',', '.');
+                $message .= " Terlambat $hariTerlambat hari. Denda: Rp " . number_format($dendaTelat, 0, ',', '.') . " (Belum dibayar)";
+            } else {
+                $message .= " Tepat waktu. Tidak ada denda.";
             }
 
             return redirect()->route('transaksi.index')->with('success', $message);
@@ -361,7 +369,7 @@ class TransaksiController extends Controller
                 'denda_telat' => 0,
                 'denda_hilang' => $this->DENDA_HILANG,
                 'total_denda' => $this->DENDA_HILANG,
-                'denda_dibayar' => false,
+                'denda_dibayar' => false, // PERBAIKAN: Default false
                 'keterangan' => $transaksi->keterangan ? $transaksi->keterangan . ' (Buku Hilang)' : 'Buku Hilang'
             ]);
 
@@ -370,7 +378,7 @@ class TransaksiController extends Controller
             DB::commit();
 
             return redirect()->route('transaksi.index')->with('success', 
-                'Buku berhasil ditandai sebagai hilang. Denda: Rp ' . number_format($this->DENDA_HILANG, 0, ',', '.'));
+                'Buku berhasil ditandai sebagai hilang. Denda: Rp ' . number_format($this->DENDA_HILANG, 0, ',', '.') . ' (Belum dibayar)');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -456,6 +464,7 @@ class TransaksiController extends Controller
                 $transaksi->update([
                     'denda_telat' => $dendaTelat,
                     'total_denda' => $dendaTelat + $transaksi->denda_hilang,
+                    // PERBAIKAN: Jangan otomatis ubah denda_dibayar
                 ]);
             }
         }
@@ -583,6 +592,49 @@ class TransaksiController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan saat merapikan ID transaksi.');
+        }
+    }
+    
+    // PERBAIKAN: Fungsi untuk menghitung ulang semua denda
+    public function hitungSemuaDenda()
+    {
+        DB::beginTransaction();
+        
+        try {
+            $transaksis = Transaksi::where('fp', 1)
+                ->where('denda_dibayar', false)
+                ->get();
+            
+            $count = 0;
+            
+            foreach ($transaksis as $transaksi) {
+                $hariTerlambat = $this->hitungHariTerlambat($transaksi);
+                $dendaTelat = $hariTerlambat * $this->DENDA_PER_HARI;
+                
+                // Jika ada perubahan
+                if ($dendaTelat != $transaksi->denda_telat) {
+                    $transaksi->update([
+                        'denda_telat' => $dendaTelat,
+                        'total_denda' => $dendaTelat + $transaksi->denda_hilang,
+                    ]);
+                    $count++;
+                }
+            }
+            
+            DB::commit();
+            
+            return response()->json([
+                'success' => true,
+                'count' => $count,
+                'message' => "Berhasil menghitung ulang denda untuk $count transaksi"
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat menghitung denda'
+            ]);
         }
     }
 }
